@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>高知市絶品グルメ Map</title>
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+    <style>
+        :root {
+            --primary: #FF5A5F;
+            --accent: #007AFF;
+            --glass: rgba(255, 255, 255, 0.85);
+        }
+        body { margin: 0; padding: 0; font-family: -apple-system, "Helvetica Neue", "Hiragino Kaku Gothic ProN", sans-serif; overflow: hidden; background: #f0f0f0; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+
+        .header {
+            position: absolute; top: 10px; left: 10px; right: 10px;
+            background: var(--glass); backdrop-filter: blur(10px);
+            padding: 12px 20px; border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            z-index: 10; display: flex; align-items: center; justify-content: space-between;
+        }
+        .header h1 { margin: 0; font-size: 1rem; color: #333; }
+
+        .gourmet-scroller {
+            position: absolute; bottom: 30px; left: 0; width: 100%;
+            display: flex; overflow-x: auto; scroll-snap-type: x mandatory;
+            padding-bottom: 20px; gap: 12px; z-index: 10;
+            scrollbar-width: none;
+        }
+        .gourmet-scroller::-webkit-scrollbar { display: none; }
+
+        .card {
+            flex: 0 0 80%; scroll-snap-align: center;
+            background: white; margin-left: 20px; border-radius: 20px;
+            overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            cursor: pointer;
+        }
+        .card:last-child { margin-right: 20px; }
+        .card img { width: 100%; height: 120px; object-fit: cover; background: #eee; }
+        .card-content { padding: 15px; }
+        .card-tag { display: inline-block; background: #FFF0F0; color: var(--primary); padding: 2px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: bold; margin-bottom: 5px; }
+        .card h2 { margin: 0; font-size: 1.1rem; color: #222; }
+        .card p { margin: 5px 0 0; font-size: 0.8rem; color: #666; line-height: 1.4; }
+
+        .custom-marker { cursor: pointer; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); }
+
+        .share-btn {
+            background: var(--accent); color: white; border: none;
+            padding: 8px 15px; border-radius: 20px; font-size: 0.8rem; font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>🥘 高知市絶品グルメ Map</h1>
+    <button class="share-btn" onclick="shareApp()">共有</button>
+</div>
+
+<div id="map"></div>
+<div class="gourmet-scroller" id="scroller"></div>
+
+<script>
+    const gourmetData = [
+        {
+            name: "ひろめ市場",
+            category: "定番・海鮮",
+            coords: [133.535937, 33.560116],
+            desc: "高知の食べ物が色々楽しめるおススメNo.1!　 <br>営業時間：月-土 10;00-23:00 日 9:00-23:00",
+            img: "https://img-cdn.guide.travel.co.jp/article/867/34050/A62B15D3A6AA4564B3DB23298D89D023_L.jpg"
+        },
+        {
+            name: "まんしゅう 本店",
+            category: "ジャン麺",
+            coords: [133.5516, 33.5586],
+            desc: "高知のソウルフード「ジャン麺」。ホルモンと卵が絡む絶品あんかけ！🍜　                                             <br>営業時間：月火木 11:00-14:45 17:00-21:00  土日 11:00-15:00 17:00-21:00",
+            img: "https://janmen.jp/images/ogp.jpg"
+        },
+        {
+            name: "明神丸 本店",
+            category: "カツオのたたき",
+            coords: [133.53976, 33.559915],
+            desc: "豪快な藁焼きの炎で焼かれたカツオが食べられる！🔥<br>営業時間：火-日 17:00-23:30",
+            img: "https://i.pinimg.com/originals/7d/a5/3b/7da53ba978b8ac94c3d08472c47d9b5c.jpg"
+        },
+        {
+            name: "屋台安兵衛 (餃子)",
+            category: "夜食・屋台",
+            coords: [133.5409205, 33.5632719],
+            desc: "シメにぴったり！、パリッパリの薄皮黄金餃子。🥟<br>営業時間：月-土 19:00-3:00",
+            img: "https://tse3.mm.bing.net/th/id/OIP.5HE1n2fq1EdmTbIPJysp-wHaHa?pid=ImgDet&w=474&h=474&rs=1&o=7&rm=3"
+        },
+       {
+            name: "鍋焼きラーメン 千秋",
+            category: "須崎名物・麺",
+            coords: [133.5449971, 33.5687982], // 高知市新本町2丁目15-11の座標
+            desc: "高知駅すぐ！熱々の土鍋で提供される鶏ガラ醤油の旨みが凝縮された一杯。🍜<br>営業時間：火-日 11:00-15:00 18:00-21:00",
+            img: "https://represent-kochi.com/wp-content/uploads/2025/04/s-DSC06920-1-1024x682.jpg"
+        },
+       {
+            name: "メフィストフェレス",
+            category: "喫茶・カフェ",
+            coords: [133.5355919, 33.5594744],
+            desc: "帯屋町の老舗喫茶店。アンティークな雰囲気の中で楽しむサイフォン珈琲とケーキ。☕<br>営業時間：月-金 9:00-21:00  土日  8:00-21:00",
+            img: "https://bu-sanblog.website/wp-content/uploads/2023/12/IMG_5638-768x1024.jpg"
+        },
+       {
+            name:"麺房 三宅",
+            category:"うどん",
+      　　　coords:[133.530446, 33.56967],
+            desc:"こだわりの出汁とコシのある麺が絶品の人気うどん店。<br>営業時間：月火木金 11:00〜14:00",
+            img:"https://represent-kochi.com/wp-content/uploads/2022/05/s-DSC_6307-2-1050x701.jpg"
+      }
+      　];
+
+    const map = new maplibregl.Map({
+        container: 'map',
+        style: 'https://tile.openstreetmap.jp/styles/maptiler-basic-ja/style.json',
+        center: [133.5375, 33.5606],
+        zoom: 14,
+        pitch: 45
+    });
+
+    const scroller = document.getElementById('scroller');
+
+    gourmetData.forEach((spot, index) => {
+       
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+            <img src="${spot.img}" alt="${spot.name}">
+            <div class="card-content">
+                <span class="card-tag">${spot.category}</span>
+                <h2>${spot.name}</h2>
+                <p>${spot.desc}</p>
+            </div>
+        `;
+        card.onclick = () => focusSpot(index);
+        scroller.appendChild(card);
+
+        
+        const el = document.createElement('div');
+        el.className = 'custom-marker';
+        el.innerHTML = `<svg width="40" height="40" viewBox="0 0 24 24"><path d="M12 21C16 17.5 19 14.4 19 10.5C19 6.6 15.9 3.5 12 3.5C8.1 3.5 5 6.6 5 10.5C5 14.4 8 17.5 12 21Z" fill="#FF5A5F" stroke="white" stroke-width="2"/><circle cx="12" cy="10.5" r="2.5" fill="white"/></svg>`;
+
+        new maplibregl.Marker({ element: el })
+            .setLngLat(spot.coords)
+            .addTo(map);
+    });
+
+    function focusSpot(index) {
+        const spot = gourmetData[index];
+        map.flyTo({ center: spot.coords, zoom: 16, duration: 1500 });
+    }
+
+    scroller.addEventListener('scroll', () => {
+        const index = Math.round(scroller.scrollLeft / (window.innerWidth * 0.8));
+        if (gourmetData[index]) {
+            map.easeTo({ center: gourmetData[index].coords, duration: 800 });
+        }
+    });
+
+    function shareApp() {
+        if (navigator.share) {
+            navigator.share({ title: '高知市グルメMap', url: window.location.href });
+        } else {
+            alert("URL: " + window.location.href);
+        }
+    }
+</script>
+</body>
+</html>
